@@ -18,6 +18,8 @@ use std::time::{Duration, Instant};
 use thread_parker::ThreadParker;
 use util::UncheckedOptionExt;
 use word_lock::WordLock;
+use sbrk_alloc::SbrkAlloc;
+use allocator_api::{Box, RawVec};
 
 static NUM_THREADS: AtomicUsize = ATOMIC_USIZE_INIT;
 static HASHTABLE: AtomicPtr<HashTable> = AtomicPtr::new(ptr::null_mut());
@@ -28,7 +30,7 @@ const LOAD_FACTOR: usize = 3;
 
 struct HashTable {
     // Hash buckets for the table
-    entries: Box<[Bucket]>,
+    entries: Box<[Bucket], SbrkAlloc>,
 
     // Number of bits used for the hash function
     hash_bits: u32,
@@ -38,14 +40,23 @@ struct HashTable {
 }
 
 impl HashTable {
-    fn new(num_threads: usize, prev: *const HashTable) -> Box<HashTable> {
+    fn new(num_threads: usize, prev: *const HashTable) -> Box<HashTable, SbrkAlloc> {
         let new_size = (num_threads * LOAD_FACTOR).next_power_of_two();
         let hash_bits = 0usize.leading_zeros() - new_size.leading_zeros() - 1;
-        Box::new(HashTable {
-            entries: vec![Bucket::new(); new_size].into_boxed_slice(),
+
+        let vec = RawVec::with_capacity_in(new_size, SbrkAlloc);
+        let ptr: *mut Bucket = vec.ptr();
+        for i in 0..new_size {
+            unsafe {
+                *ptr.offset(i as isize) = Bucket::new();
+            }
+        }
+
+        Box::new_in(HashTable {
+            entries: unsafe { vec.into_box() },
             hash_bits,
             _prev: prev,
-        })
+        }, SbrkAlloc)
     }
 }
 
@@ -217,7 +228,7 @@ fn get_hashtable() -> *mut HashTable {
 
         // Free the table we created
         unsafe {
-            Box::from_raw(new_table);
+            Box::from_raw_in(new_table, SbrkAlloc);
         }
     }
 
@@ -247,7 +258,7 @@ unsafe fn grow_hashtable(num_threads: usize) {
         }
 
         // Free the table we created
-        Box::from_raw(new_table);
+        Box::from_raw_in(new_table, SbrkAlloc);
     }
 
     let mut old_table;

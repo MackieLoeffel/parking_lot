@@ -45,6 +45,7 @@
 
 extern crate rand;
 extern crate smallvec;
+extern crate allocator_api;
 
 #[cfg(feature = "deadlock_detection")]
 extern crate backtrace;
@@ -76,6 +77,7 @@ mod parking_lot;
 mod spinwait;
 mod util;
 mod word_lock;
+mod sbrk_alloc;
 
 pub use parking_lot::deadlock;
 pub use parking_lot::{park, unpark_all, unpark_filter, unpark_one, unpark_requeue};
