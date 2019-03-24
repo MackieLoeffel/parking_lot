@@ -264,7 +264,15 @@ impl Condvar {
     /// with a different `Mutex` object.
     #[inline]
     pub fn wait<T: ?Sized>(&self, mutex_guard: &mut MutexGuard<T>) {
-        self.wait_until_internal(unsafe { MutexGuard::mutex(mutex_guard).raw() }, None);
+        unsafe {
+            self.wait_raw(MutexGuard::mutex(mutex_guard).raw());
+        }
+    }
+
+    /// mutex must be locked
+    #[inline]
+    pub unsafe fn wait_raw(&self, mutex: &RawMutex) {
+        self.wait_until_internal(mutex, None);
     }
 
     /// Waits on this condition variable for a notification, timing out after
@@ -296,8 +304,21 @@ impl Condvar {
         mutex_guard: &mut MutexGuard<T>,
         timeout: Instant,
     ) -> WaitTimeoutResult {
+        unsafe {self.wait_until_raw(
+            MutexGuard::mutex(mutex_guard).raw(),
+            timeout
+        ) }
+    }
+
+    /// mutex must be locked
+    #[inline]
+    pub unsafe fn wait_until_raw(
+        &self,
+        mutex: &RawMutex,
+        timeout: Instant,
+    ) -> WaitTimeoutResult {
         self.wait_until_internal(
-            unsafe { MutexGuard::mutex(mutex_guard).raw() },
+            mutex,
             Some(timeout),
         )
     }
@@ -400,8 +421,21 @@ impl Condvar {
         mutex_guard: &mut MutexGuard<T>,
         timeout: Duration,
     ) -> WaitTimeoutResult {
+        unsafe {
+            self.wait_for_raw( MutexGuard::mutex(mutex_guard).raw(),
+                               timeout)
+        }
+    }
+
+    /// mutex must be locked
+    #[inline]
+    pub unsafe fn wait_for_raw(
+        &self,
+        mutex: &RawMutex,
+        timeout: Duration,
+    ) -> WaitTimeoutResult {
         let deadline = util::to_deadline(timeout);
-        self.wait_until_internal(unsafe { MutexGuard::mutex(mutex_guard).raw() }, deadline)
+        self.wait_until_internal(mutex, deadline)
     }
 }
 
