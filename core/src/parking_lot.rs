@@ -6,7 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 use rand::rngs::SmallRng;
-use rand::{FromEntropy, Rng};
+use rand::{SeedableRng, Rng};
 use smallvec::SmallVec;
 use std::cell::{Cell, UnsafeCell};
 #[cfg(not(has_localkey_try_with))]
@@ -111,7 +111,9 @@ impl FairTimeout {
     fn new() -> FairTimeout {
         FairTimeout {
             timeout: Instant::now(),
-            rng: SmallRng::from_entropy(),
+            // we cannot use from_entropy since this may use ONCE internally (in the getrandom crate for is_getrandom_available) which would deadlock
+            // rng: SmallRng::from_entropy(),
+            rng: SmallRng::seed_from_u64(0xdeadbeef)
         }
     }
 
